@@ -34,7 +34,9 @@ int main( int argc, char *argv[] )
 #define  IAA_ID        22
 #define  COORD_ID      23
 #define  ANSWER_ID     24
+#define  IAM_DEAD_JIM  998
 #define  TERMINATE     999
+
 
 void usage(char * cmd, int rank) {
   if (0 ==  rank) 
