@@ -1,9 +1,14 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <string.h>
+
 #include "mpi.h"
 
 /******* FG-MPI Boilerplate begin *********/
 #include "fgmpi.h"
+
 int bully( int argc, char** argv ); /*forward declaration*/
 FG_ProcessPtr_t binding_func(int argc __attribute__ ((unused)), 
 			     char** argv __attribute__ ((unused)), 
@@ -100,9 +105,9 @@ int bully( int argc, char** argv )
       
       printf("argv[%d] = ", i); 
       if (*endPtr == '\0') { // valid conversion
-	printf("%d\n", val);
+	       printf("%d\n", val);
       } else {
-	printf(" Not a valid number\n");
+	       printf(" Not a valid number\n");
       }
     }
   }
@@ -136,7 +141,7 @@ int bully( int argc, char** argv )
 	       &status);    // This provides some feedback on the receive
 
       msgCount++;
-      printf("Message from %d buff size %d count %d tag %d contents %d\n", 
+      printf("-144- Message from %d buff size %d count %d tag %d contents %d\n", 
 	     status.MPI_SOURCE,
 	     buff_size,
 	     status.count, 
@@ -158,7 +163,7 @@ int bully( int argc, char** argv )
       MPI_Recv(&buffer, buff_size, MPI_INT, MPI_ANY_SOURCE, 
 	       IAA_ID, MPI_COMM_WORLD, &status);
       msgCount++;
-      printf("Message from %d size %d tag %d contents %d\n", 
+      printf("-166- Message from %d size %d tag %d contents %d\n", 
 	     status.MPI_SOURCE, 
 	     status.count, 
 	     status.MPI_TAG,
@@ -169,7 +174,7 @@ int bully( int argc, char** argv )
       MPI_Send(&buffer, 1, MPI_INT, status.MPI_SOURCE, IAA_ID, MPI_COMM_WORLD);
       MPI_Recv(&buffer, buff_size, MPI_INT, status.MPI_SOURCE, 
 	       IAA_ID, MPI_COMM_WORLD, &status);
-      printf("Message from %d size %d tag %d contents %d\n", 
+      printf("-177- Message from %d size %d tag %d contents %d\n", 
 	     status.MPI_SOURCE, 
 	     status.count, 
 	     status.MPI_TAG,
@@ -200,7 +205,7 @@ int bully( int argc, char** argv )
 	       MPI_ANY_SOURCE, IAA_ID, MPI_COMM_WORLD, &stat);
       // printf("%d GOTTA a message\n", rank);
       if (sbuffer == TERMINATE) 
-	break;
+	     break;
 
       // Now send a message back
       sbuffer = rank + 20000;
