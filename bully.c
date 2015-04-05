@@ -42,6 +42,9 @@ int main( int argc, char *argv[] )
 #define  IAM_DEAD_JIM  998
 #define  TERMINATE     999
 
+#define FALSE 0
+#define TRUE !FALSE
+
 
 void usage(char * cmd, int rank) {
   if (0 ==  rank) 
@@ -58,6 +61,9 @@ int bully( int argc, char** argv )
  
 
   MPI_Status status;
+  int DLC = 0; // logical clock
+  int MODE, TIMEOUT, AYATIME, SENDFAILURE, RETURNLIFE;
+  int tval = 0, electing = FALSE, probing = TRUE;
   
   /* From the file mpi.h this is the definition for MPI_status, with my comments on the 
      fields
@@ -87,32 +93,16 @@ int bully( int argc, char** argv )
   MPIX_Get_collocated_size(&coSize);
   MPIX_Get_collocated_startrank(&sRank);
 
+  char *endPtr;
+  MODE = (int) strtol(argv[1], &endPtr, 10);
+  TIMEOUT = (int) strtol(argv[2], &endPtr, 10);
+  AYATIME = (int) strtol(argv[3], &endPtr, 10);
+  SENDFAILURE = (int) strtol(argv[4], &endPtr, 10);
+  RETURNLIFE = (int) strtol(argv[5], &endPtr, 10);
+  printf("World: %d, Rank: %d, Col-Group: %d, Starter: %d\n", size, rank, coSize, sRank);
+  printf("MODE: %d, TIMEOUT: %d, AYATIME: %d, SENDFAILURE: %d, RETURNLIFE: %d\n", );
 
-  // For demo purposes let's get all the command line arguments, and if we are 
-  // rank 0 print them. 
-  
-  if (0 == rank) {
-    printf("argv[0] = %s\n", argv[0]);
-    // Assuming remaing args are all integers if you want to 
-    // remember them assign them to a variable
-
-    int i ;
-    for (i = 1; i < argc; i++) {
-      char *endPtr;
-      int val;
-	
-      val = strtol(argv[i], &endPtr, 10);
-      
-      printf("argv[%d] = ", i); 
-      if (*endPtr == '\0') { // valid conversion
-	       printf("%d\n", val);
-      } else {
-	       printf(" Not a valid number\n");
-      }
-    }
-  }
-  printf("Hello! I am rank %d of %d co-located size is %d, start rank %d \n", 
-	 rank, size, coSize, sRank);
+  return; 
   
   // If I am node 0 I'll wait for everyone to send a message to me. 
   // If I am not node 0 then I'll send a message to node 0
