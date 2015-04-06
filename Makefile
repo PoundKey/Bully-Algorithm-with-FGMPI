@@ -32,6 +32,10 @@ clean:
 demo: bully
 	$(MPICROOT)/bin/mpirun  -nfg 10 -n 4 ./bully
 
+begin:bully
+	 $(MPICROOT)/bin/mpirun  -nfg 3 -n 3 ./bully 0 10 5 10 21
+init:bully
+	$(MPICROOT)/bin/mpirun  -nfg 2 -n 2 ./bully 0 5 3 10 21
 FORCE:
 
 first_target: all
