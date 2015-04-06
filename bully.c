@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 #include <time.h>
+#include <netinet/in.h>
 
 #include "mpi.h"
 
@@ -14,11 +15,11 @@
 int bully( int argc, char** argv );
 char* get_idname(int id, char* buf);
 int random_num(int min_num, int max_num);
-void send_message(int source, int dest, int type, int* buffer, int buff_size, int send_failure, int mode);
+void send_message(int source, int dest, int type, int* buffer, int buff_size, int send_failure, int mode, int DLC);
 void set_clock(int* buf, int* dlc);
 void update_clock(int* local, int remote);
-void call_election(int size, int rank, int* buffer, int buff_size, int send_failure, int mode);
-void send_coord(int rank, int* buffer, int buff_size, int send_failure, int mode);
+void call_election(int size, int rank, int* buffer, int buff_size, int send_failure, int mode, int DLC);
+void send_coord(int rank, int* buffer, int buff_size, int send_failure, int mode, int dlc);
 
 /*forwdrd declaration*/
 
@@ -55,6 +56,7 @@ int main( int argc, char *argv[] )
 #define FALSE 0
 #define TRUE !FALSE
 
+char IDBUF[21]; //just a buffer to show Message ID => Message name
 
 void usage(char * cmd, int rank) {
     if (0 ==  rank)
@@ -71,13 +73,13 @@ int bully( int argc, char** argv )
     int timeout_val = 0; //timeout tracking value in second
     int aya_val = 0; //AYA message tracking value in second
     
-    int electing = FALSE, probing = TRUE, isCoord = FALSE, isActive = TRUE;
+    int electing = FALSE, probing = TRUE, isCoord = FALSE, isActive = TRUE, isAnswer = FALSE;
     
     int coordinator; // the rank of coordinator
     
-    char IDBUF[21];
+    //char IDBUF[21];
     
-    int buffer[2];  //buffer[0] = DLC, buffer[1] = Coordinator Number
+    int buffer[2];  //buffer[0] = DLC, buffer[1] = TBD
     int buff_size = 2;
     
     
@@ -118,7 +120,7 @@ int bully( int argc, char** argv )
             // delcare leader before sending out the coordination message
             printf("[ DLC: %d ] [ LEADER ] [ Node: %d ] declares itself as the leader! \n", DLC, rank);
             set_clock(buffer, &DLC); //increase logical clock and store it in buffer[0]
-            send_coord(rank, buffer, buff_size, SENDFAILURE, MODE); // send coordination messages
+            send_coord(rank, buffer, buff_size, SENDFAILURE, MODE, DLC); // send coordination messages
         }
         
         while (1) {
@@ -129,8 +131,12 @@ int bully( int argc, char** argv )
              */
             int MSG_ID = status.MPI_TAG;
             int remote_rank = status.MPI_SOURCE;
+            if (MODE && MSG_ID != CLOCK_ID) {
+                printf("[ DLC: %d] Message Recv >>> Home: [ Node: %d] SR: [ Node: %d ], Message Type: %d [ %s ] \n", DLC, rank, remote_rank, MSG_ID, get_idname(MSG_ID, IDBUF));
+                printf("buffer[0]: %d \n\n", buffer[0]);
+            }
             
-            if (MSG_ID != CLOCK_ID && isActive) {
+            if (MSG_ID != CLOCK_ID) {
                 update_clock(&DLC, buffer[0]);
             }
             
@@ -142,9 +148,10 @@ int bully( int argc, char** argv )
                             probing = FALSE;
                             timeout_val = 0; //Start timeout
                             set_clock(buffer, &DLC);
-                            MPI_Send(&buffer, buff_size, MPI_INT, remote_rank, ANSWER_ID, MPI_COMM_WORLD);
+                            //MPI_Send(&buffer, buff_size, MPI_INT, remote_rank, ANSWER_ID, MPI_COMM_WORLD);
+                            send_message(rank, remote_rank, ANSWER_ID, buffer, buff_size, SENDFAILURE, MODE, DLC);
                             set_clock(buffer, &DLC);
-                            call_election(size, rank, buffer, buff_size, SENDFAILURE, MODE);
+                            call_election(size, rank, buffer, buff_size, SENDFAILURE, MODE, DLC);
                         }
                     }
                     break;
@@ -152,7 +159,8 @@ int bully( int argc, char** argv )
                     if (isActive) {
                         if (isCoord) {
                             set_clock(buffer, &DLC);
-                            MPI_Send(&buffer, buff_size, MPI_INT, remote_rank, IAA_ID, MPI_COMM_WORLD);
+                            //MPI_Send(&buffer, buff_size, MPI_INT, remote_rank, IAA_ID, MPI_COMM_WORLD);
+                            send_message(rank, remote_rank, IAA_ID, buffer, buff_size, SENDFAILURE, MODE, DLC);
                         }
                     }
                     break;
@@ -160,6 +168,8 @@ int bully( int argc, char** argv )
                     if (isActive) {
                         if (probing && !isCoord) {
                             timeout_val = 0;
+                            probing = TRUE;
+                            electing = FALSE;
                         }
                     }
 
@@ -170,19 +180,31 @@ int bully( int argc, char** argv )
                             coordinator = remote_rank;
                             electing = FALSE;
                             probing = TRUE;
+                            isAnswer = FALSE;
+                            isCoord = FALSE;
                             timeout_val = 0;
                             aya_val = 0;
                         } else {
+                            electing = TRUE;
+                            probing = FALSE;
+                            isAnswer = FALSE;
+                            isCoord = FALSE;
+                            timeout_val = 0;
+                            aya_val = 0;
+                            printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! \n", DLC, rank);
                             set_clock(buffer, &DLC);
-                            call_election(size, rank, buffer, buff_size, SENDFAILURE, MODE);
+                            call_election(size, rank, buffer, buff_size, SENDFAILURE, MODE, DLC);
                         }
                     }
                     break;
                 case ANSWER_ID:
                     if (isActive) {
-                        electing = FALSE;
-                        probing = TRUE;
+                        electing = TRUE;
+                        probing = FALSE;
+                        isAnswer = TRUE;
+                        isCoord = FALSE;
                         timeout_val = 0;
+                        aya_val = 0;
                     }
 
                     break;
@@ -192,16 +214,13 @@ int bully( int argc, char** argv )
                             timeout_val++;
                             aya_val++;
                         } else {
+                            //if it's in eleting or it's a coordinator, only increase its timeout value
                             timeout_val++;
                         }
                     } else {
                         timeout_val++;
                     }
                     
-                    /**
-                    printf("RECV_IN: %d >>> Source: %d, TAG_ID: %d [ %s ], Buffer[0]: %d\n", rank,
-                           status.MPI_SOURCE, status.MPI_TAG, get_idname(status.MPI_TAG, IDBUF), buffer[0]);
-                     */
                     break;
                 case IAM_DEAD_JIM:
                   
@@ -220,33 +239,78 @@ int bully( int argc, char** argv )
                     // current node is in probing state, and it's not a coordinator
                     if (aya_val == AYATIME) {
                         set_clock(buffer, &DLC);
-                        MPI_Send(&buffer, buff_size, MPI_INT, coordinator, AYA_ID, MPI_COMM_WORLD);
+                        //MPI_Send(&buffer, buff_size, MPI_INT, coordinator, AYA_ID, MPI_COMM_WORLD);
+                        send_message(rank, coordinator, AYA_ID, buffer, buff_size, SENDFAILURE, MODE, DLC);
                         aya_val = 0;
                     }
                     
                     if (timeout_val == TIMEOUT) {
+                        //Timeout due to no response from the coordinator, claims coordination failure and call an election
+                        printf("[ DLC: %d ] [ LEADERDEAD ] [ Node: %d ] detects/claims a coordinator failure! \n", DLC, rank);
+                        printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! \n", DLC, rank);
                         //switch to election state when timeout
                         set_clock(buffer, &DLC);
-                        call_election(size, rank, buffer, buff_size, SENDFAILURE, MODE);
+                        call_election(size, rank, buffer, buff_size, SENDFAILURE, MODE, DLC);
                         probing = FALSE;
                         electing = TRUE;
+                        isAnswer = FALSE;
                         timeout_val = 0;
                         aya_val = 0;
                     }
                 } else if (probing && isCoord) {
-                    //TODO
+                    if (timeout_val == (TIMEOUT*3)) {
+                        isActive = FALSE;
+                        isCoord = FALSE;
+                        isAnswer= FALSE;
+                        timeout_val = 0;
+                        aya_val = 0;
+                        printf("[ DLC: %d ] [ DEAD ] [ Node: %d ] coordinator declares its death! \n", DLC, rank);
+                    }
                 }
                 
                 
-                if (electing) {
-                    
+                if (electing && !isCoord) {
+                    if (timeout_val == TIMEOUT) {
+                        if (!isAnswer) {
+                            //declare myself as coordinator
+                            coordinator = rank;
+                            probing = TRUE;
+                            electing = FALSE;
+                            timeout_val = 0;
+                            aya_val = 0;
+                            printf("[ DLC: %d ] [ LEADER ] [ Node: %d ] declares itself as the leader! \n", DLC, rank);
+                            set_clock(buffer, &DLC);
+                            send_coord(rank, buffer, buff_size, SENDFAILURE, MODE, DLC);
+                        } else if (isAnswer) {
+                            // call election again, assume that no coordinate message received after receving answer_id
+                            probing = FALSE;
+                            electing = TRUE;
+                            isAnswer = FALSE;
+                            timeout_val = 0;
+                            aya_val = 0;
+                            printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! \n", DLC, rank);
+                            set_clock(buffer, &DLC);
+                            call_election(size, rank, buffer, buff_size, SENDFAILURE, MODE, DLC);
+                        }
+                    }
                     
                 }
-                
-                
                 
             } else {
-             // when the current node is in active
+             // when the current node is inactive
+                if (timeout_val == RETURNLIFE) {
+                    isActive = TRUE;
+                    probing = FALSE;
+                    electing = TRUE;
+                    isAnswer = FALSE;
+                    isCoord = FALSE;
+                    timeout_val = 0;
+                    aya_val = 0;
+                    printf("[ DLC: %d ] [ ALIVE ] [ Node: %d ] coordinator declares its alive! \n", DLC, rank);
+                    printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! \n", DLC, rank);
+                    set_clock(buffer, &DLC);
+                    call_election(size, rank, buffer, buff_size, SENDFAILURE, MODE, DLC);
+                }
                 
             }
             
@@ -309,15 +373,18 @@ int random_num(int min_num, int max_num) {
     return result;
 }
 
-void send_message(int source, int dest, int type, int* buffer, int buff_size, int send_failure, int mode) {
+void send_message(int source, int dest, int type, int* buffer, int buff_size, int send_failure, int mode, int DLC) {
     int chance = random_num(1, 100);
     // success in sending the message
     if(chance > send_failure){
         MPI_Send(&buffer, buff_size, MPI_INT, dest, type, MPI_COMM_WORLD);
+        if (mode) {
+            printf("[ DLC: %d] Message Sent >>> From: [ Node: %d] To: [ Node: %d ], Message Type: %d [ %s ] \n", DLC, source, dest, type, get_idname(type,IDBUF));
+        }
     } else {
         //send message failure
         if (mode) {
-            printf("Sending Failure >>> From: [ Node: %d] To: [ Node: %d ], Message Type: [ %d ] \n", source, dest, type);
+            printf("[ DLC: %d] Sending Failure >>> From: [ Node: %d] To: [ Node: %d ], Message Type: %d [ %s ] \n", DLC, source, dest, type, get_idname(type,IDBUF));
         }
     }
 }
@@ -325,30 +392,31 @@ void send_message(int source, int dest, int type, int* buffer, int buff_size, in
 //before send message, increase its DLC and set buffer[0] = DLC
 void set_clock(int* buf, int* dlc) {
     *dlc += 1;
-    buf[0] = *dlc;
+    buf[0] = htonl(*dlc);
 }
 //upon receving a message from other node, update DLC
 void update_clock(int* local, int remote) {
-    if (*local < remote) {
-        *local = remote;
+    int remote_conv = ntohl(remote);
+    if (*local < remote_conv) {
+        *local = remote_conv;
     }
 }
 
 // call for an election
-void call_election(int size, int rank, int* buffer, int buff_size, int send_failure, int mode) {
+void call_election(int size, int rank, int* buffer, int buff_size, int send_failure, int mode, int DLC) {
     int i;
     for (i=rank+1; i < size; i++) {
         //MPI_Send(&buffer, buff_size, MPI_INT, i, ELECTION_ID, MPI_COMM_WORLD);
-        send_message(rank, i, ELECTION_ID, buffer, buff_size, send_failure, mode);
+        send_message(rank, i, ELECTION_ID, buffer, buff_size, send_failure, mode, DLC);
     }
 }
 
 //send coordination message
-void send_coord(int rank, int* buffer, int buff_size, int send_failure, int mode) {
+void send_coord(int rank, int* buffer, int buff_size, int send_failure, int mode, int DLC) {
     int i = rank - 1;
     while (i > 0) {
         //MPI_Send(&buffer, buff_size, MPI_INT, i, COORD_ID, MPI_COMM_WORLD);
-        send_message(rank, i, COORD_ID, buffer, buff_size, send_failure, mode);
+        send_message(rank, i, COORD_ID, buffer, buff_size, send_failure, mode, DLC);
         i--;
     }
 }
