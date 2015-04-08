@@ -46,6 +46,10 @@ FG_MapPtr_t map_lookup(int argc __attribute__ ((unused)),
 
 int main( int argc, char *argv[] )
 {
+    if (argc != 6) {
+        printf("Usage mpirun -nfg X -n Y ./bully MODE TIMEOUT AYATIME SENDFAILURE RETURNLIFE \n");
+        return 0;
+    }
     FGmpiexec(&argc, &argv, &map_lookup);
     return (0);
 }
@@ -75,7 +79,6 @@ int bully( int argc, char** argv ) {
     int rank, size, coSize, sRank;
     MPI_Status status;
     
-    srand(time(NULL)); //used for generate survival rate
     int DLC = 0; // logical clock
     int MODE, TIMEOUT, AYATIME, SENDFAILURE, RETURNLIFE;
     int timeout_val = 0; //timeout tracking value in second
@@ -116,7 +119,8 @@ int bully( int argc, char** argv ) {
         }
         
         
-    } else {
+    }
+    else {
         // when the program starts, the node with the highest rank declares itself as the coordinator
         // send coordination messages to all other nodes except node 0 (clock process)
         coordinator = size - 1;
@@ -150,130 +154,130 @@ int bully( int argc, char** argv ) {
                         if (rank > remote_rank) {
                             switch (state) {
                                 case PROBING:
-                                    //TODO
-                                    break;
-                                case ELECTING:
-                                    //TODO
-                                    break;
-                                case COORDINATING:
-                                    //TODO
-                                    break;
-                            }
-                        } else {
-                            switch (state) {
-                                case PROBING:
-                                    //TODO
-                                    break;
-                                case ELECTING:
-                                    //TODO
-                                    break;
-                                case COORDINATING:
-                                    //TODO
-                                    break;
-                            }
-                            break;
-                        case AYA_ID:
-                            if (state == COORDINATING) {
-                                // Generate a random number between 1-100, to determine if the coordinator should die
-                                int survivalRate = rand()%100 + 1;
-                                if (survivalRate > SENDFAILURE) {
-                                    // Oh yes, the node survived, send back a IAA message
-                                    send_message(rank, remote_rank, IAA_ID, buffer, buff_size, MODE, &DLC);
-                                } else {
-                                    // Coordinator enters a sudo death state
-                                    isActive = FALSE;
-                                    state = PROBING;
+                                    // Call an election, if current node has a higher rank
+                                    state = ELECTING;
                                     isAnswer = FALSE;
                                     clear_val(&timeout_val, &aya_val);
-                                }
-                                
+                                    send_message(rank, remote_rank, ANSWER_ID, buffer, buff_size, MODE, &DLC);
+                                    call_election(size, rank, buffer, buff_size, MODE, &DLC);
+                                    break;
+                                case ELECTING:
+                                    // Send back an asnwer, without calling an election
+                                    send_message(rank, remote_rank, ANSWER_ID, buffer, buff_size, MODE, &DLC);
+                                    break;
+                                case COORDINATING:
+                                    // Send back a coord message, sit back and relax
+                                    send_message(rank, remote_rank, COORD_ID, buffer, buff_size, MODE, &DLC);
+                                    break;
                             }
-                            break;
-                        case IAA_ID:
-                            if (state == PROBING)
-                                timeout_val = 0;
-                            break;
-                        case COORD_ID:
-                            if (rank > remote_rank) {
-                                //call an election if local node rank is greater than the coordinator's
-                                state = ELECTING;
-                                isAnswer = FALSE;
-                                clear_val(&timeout_val, &aya_val);
-                                printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! \n", DLC, rank);
-                                call_election(size, rank, buffer, buff_size, MODE, &DLC);
+                        }
+                        break;
+                    case AYA_ID:
+                        if (state == COORDINATING) {
+                            // Generate a random number between 1-100, to determine if the coordinator should die
+                            srand(time(NULL)); //used for generate survival rate
+                            int survivalRate = rand()%100 + 1;
+                            if (survivalRate > SENDFAILURE) {
+                                // Oh yes, the node survived, send back a IAA message
+                                if (MODE) {
+                                    printf(">>> Survival rate: %d > %d (SF), I will live on! (Coordinator: %d) \n\n", survivalRate, SENDFAILURE, rank);
+                                }
+                                send_message(rank, remote_rank, IAA_ID, buffer, buff_size, MODE, &DLC);
                             } else {
-                                //set the coordinator
-                                coordinator = remote_rank;
+                                // Coordinator enters a sudo death state
+                                isActive = FALSE;
                                 state = PROBING;
                                 isAnswer = FALSE;
                                 clear_val(&timeout_val, &aya_val);
+                                printf("[ DLC: %d ]  [ DEAD ]  [ Node: %d ] enters a sudo-dead mode! \n", DLC, rank);
                             }
-                            break;
-                        case ANSWER_ID:
+                            
+                        }
+                        break;
+                    case IAA_ID:
+                        if (state == PROBING)
+                            timeout_val = 0;
+                        break;
+                    case COORD_ID:
+                        if (rank > remote_rank) {
+                            //call an election if local node rank is greater than the coordinator's
                             state = ELECTING;
-                            isAnswer = TRUE;
+                            isAnswer = FALSE;
                             clear_val(&timeout_val, &aya_val);
-                            break;
-                        case CLOCK_ID:
-                            if (state == PROBING) {
-                                aya_val++;
-                            }
-                            timeout_val++;
-                            break;
-                        case IAM_DEAD_JIM:
-                            // RESERVED
-                            break;
-                        case TERMINATE:
-                            // RESERVERD
-                            break;
-                        default:
-                            break;
-                        } // end switch(MSG_ID)
+                            printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! \n", DLC, rank);
+                            call_election(size, rank, buffer, buff_size, MODE, &DLC);
+                        } else {
+                            //set the coordinator
+                            coordinator = remote_rank;
+                            state = PROBING;
+                            isAnswer = FALSE;
+                            clear_val(&timeout_val, &aya_val);
+                        }
+                        break;
+                    case ANSWER_ID:
+                        state = ELECTING;
+                        isAnswer = TRUE;
+                        clear_val(&timeout_val, &aya_val);
+                        break;
+                    case CLOCK_ID:
+                        if (state == PROBING) {
+                            aya_val++;
+                        }
+                        timeout_val++;
+                        break;
+                    case IAM_DEAD_JIM:
+                        // RESERVED
+                        break;
+                    case TERMINATE:
+                        // RESERVERD
+                        break;
+                    default:
+                        break;
+                } // end switch(MSG_ID)
+                
+                
+                switch (state) {
+                    case PROBING:
+                        //send aya message to the coordinator if AYATIME reached
+                        if (aya_val == AYATIME) {
+                            send_message(rank, coordinator, AYA_ID, buffer, buff_size, MODE, &DLC);
+                            aya_val = 0; //reset aya_val for next round of probing
+                        }
                         
-                        
-                        switch (state) {
-                            case PROBING:
-                                //send aya message to the coordinator if AYATIME reached
-                                if (aya_val == AYATIME) {
-                                    send_message(rank, coordinator, AYA_ID, buffer, buff_size, MODE, &DLC);
-                                    aya_val = 0; //reset aya_val for next round of probing
-                                }
-                                
-                                //Oops, timeout in probing state, coordinator is dead, we need to call an election
-                                if (timeout_val == TIMEOUT) {
-                                    printf("[ DLC: %d ]  [ LEADERDEAD ] [ Node: %d ] detects coordinator failure! \n", DLC, rank);
-                                    printf("[ DLC: %d ]  [ ELECTION ]   [ Node: %d ] calls an election! \n", DLC, rank);
-                                    state = ELECTING;
-                                    isAnswer = FALSE;
-                                    clear_val(&timeout_val, &aya_val);
-                                    call_election(size, rank, buffer, buff_size, MODE, &DLC);
-                                }
-                                break;
-                            case ELECTING:
-                                // current node has involved in a electing
-                                // Oops, timeout reached in electing state,
-                                // declare itself as the coordinator and send coordination message
-                                if ((timeout_val == TIMEOUT) && !isAnswer) {
-                                    coordinator = rank;
-                                    state = COORDINATING;
-                                    isAnswer = FALSE;
-                                    clear_val(&timeout_val, &aya_val);
-                                    printf("[ DLC: %d ]  [ LEADER ] [ Node: %d ] declares itself as the coordinator! \n", DLC, rank);
-                                    send_coord(rank, buffer, buff_size, MODE, &DLC);
-                                } else if ((timeout_val == TIMEOUT) && isAnswer) {
-                                    // call election again, because the only answer received, but not the coordination message
-                                    state = ELECTING;
-                                    clear_val(&timeout_val, &aya_val);
-                                    printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! \n", DLC, rank);
-                                    call_election(size, rank, buffer, buff_size, MODE, &DLC);
-                                }
-                                break;
-                            case COORDINATING:
-                                //TODO: may not be necessary, save this for later
-                                break;
-                        } //end of switch(state)
-                }
-            }// end of active state message handling
+                        //Oops, timeout in probing state, coordinator is dead, we need to call an election
+                        if (timeout_val == TIMEOUT) {
+                            printf("[ DLC: %d ]  [ LEADERDEAD ] [ Node: %d ] detects coordinator failure! \n", DLC, rank);
+                            printf("[ DLC: %d ]  [ ELECTION ]   [ Node: %d ] calls an election! \n", DLC, rank);
+                            state = ELECTING;
+                            isAnswer = FALSE;
+                            clear_val(&timeout_val, &aya_val);
+                            call_election(size, rank, buffer, buff_size, MODE, &DLC);
+                        }
+                        break;
+                    case ELECTING:
+                        // current node has involved in a electing
+                        // Oops, timeout reached in electing state,
+                        // declare itself as the coordinator and send coordination message
+                        if ((timeout_val == TIMEOUT) && !isAnswer) {
+                            coordinator = rank;
+                            state = COORDINATING;
+                            isAnswer = FALSE;
+                            clear_val(&timeout_val, &aya_val);
+                            printf("[ DLC: %d ]  [ LEADER ] [ Node: %d ] declares itself as the coordinator! \n", DLC, rank);
+                            send_coord(rank, buffer, buff_size, MODE, &DLC);
+                        } else if ((timeout_val == TIMEOUT) && isAnswer) {
+                            // call election again, because the only answer received, but not the coordination message
+                            state = ELECTING;
+                            clear_val(&timeout_val, &aya_val);
+                            printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! \n", DLC, rank);
+                            call_election(size, rank, buffer, buff_size, MODE, &DLC);
+                        }
+                        break;
+                    case COORDINATING:
+                        //TODO: may not be necessary, save this for later
+                        break;
+                } //end of switch(state)
+            } // end of active state message handling
             else {
                 // Start Handling incoming messages for nodes that are not active
                 switch (MSG_ID) {
@@ -296,13 +300,12 @@ int bully( int argc, char** argv ) {
                     call_election(size, rank, buffer, buff_size, MODE, &DLC);
                 }
             } // end of inactive state message handling
-        }
+        } //end of while(1) looping
         
-    }
-    
-    MPI_Finalize();
-    return(0);
-}
+        MPI_Finalize();
+        return(0);
+    } // end of node handling for non 0 ranks
+} // end of bully function
 
 
 void clear_val(int* timeout_val, int* aya_val) {
