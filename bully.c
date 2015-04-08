@@ -71,8 +71,7 @@ void usage(char * cmd, int rank) {
         printf("Usage mpirun -nfg X -n Y %s Z\n where X*Y must be >= Z\n", cmd);
 }
 
-int bully( int argc, char** argv )
-{
+int bully( int argc, char** argv ) {
     int rank, size, coSize, sRank;
     MPI_Status status;
     
@@ -272,131 +271,129 @@ int bully( int argc, char** argv )
                             case COORDINATING:
                                 //TODO: may not be necessary, save this for later
                                 break;
-                            default:
-                                break;
-                        }
+                        } //end of switch(state)
+                }
+            }// end of active state message handling
+            else {
+                // Start Handling incoming messages for nodes that are not active
+                switch (MSG_ID) {
                         
-                }// end of active state message handling
-                else {
-                    // Start Handling incoming messages for nodes that are not active
-                    switch (MSG_ID) {
-                            
-                        case CLOCK_ID:
-                            timeout_val++;
-                            break;
-                        default:
-                            break;
-                    }
-                    
-                    //when return to life timeout reached, switch state to become active
-                    if (timeout_val == RETURNLIFE) {
-                        isActive = TRUE;
-                        isAnswer = FALSE;
-                        state = ELECTING;
-                        clear_val(&timeout_val, &aya_val);
-                        printf("[ DLC: %d ]  [ ALIVE ]     [ Node: %d ] ex-coordinator declares its return to alive! \n", DLC, rank);
-                        printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! \n", DLC, rank);
-                        call_election(size, rank, buffer, buff_size, MODE, &DLC);
-                    }
-                } // end of inactive state message handling
-            }
-            
+                    case CLOCK_ID:
+                        timeout_val++;
+                        break;
+                    default:
+                        break;
+                }
+                
+                //when return to life timeout reached, switch state to become active
+                if (timeout_val == RETURNLIFE) {
+                    isActive = TRUE;
+                    isAnswer = FALSE;
+                    state = ELECTING;
+                    clear_val(&timeout_val, &aya_val);
+                    printf("[ DLC: %d ]  [ ALIVE ]     [ Node: %d ] ex-coordinator declares its return to alive! \n", DLC, rank);
+                    printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! \n", DLC, rank);
+                    call_election(size, rank, buffer, buff_size, MODE, &DLC);
+                }
+            } // end of inactive state message handling
         }
         
-        MPI_Finalize();
-        return(0);
     }
     
-    
-    void clear_val(int* timeout_val, int* aya_val) {
-        *timeout_val = 0;
-        *aya_val = 0;
+    MPI_Finalize();
+    return(0);
+}
+
+
+void clear_val(int* timeout_val, int* aya_val) {
+    *timeout_val = 0;
+    *aya_val = 0;
+}
+
+char* get_idname(int id, char* buf) {
+    memset(buf, 0, 21);
+    switch (id) {
+        case ELECTION_ID:
+            strncpy(buf, "ELECTION_ID", 20);
+            break;
+        case AYA_ID:
+            strncpy(buf, "AYA_ID", 20);
+            break;
+        case IAA_ID:
+            strncpy(buf, "IAA_ID", 20);
+            break;
+        case COORD_ID:
+            strncpy(buf, "COORD_ID", 20);
+            break;
+        case ANSWER_ID:
+            strncpy(buf, "ANSWER_ID", 20);
+            break;
+        case CLOCK_ID:
+            strncpy(buf, "CLOCK_ID", 20);
+            break;
+        case IAM_DEAD_JIM:
+            strncpy(buf, "IAM_DEAD_JIM", 20);
+            break;
+        case TERMINATE:
+            strncpy(buf, "TERMINATE", 20);
+            break;
+        default:
+            break;
     }
-    
-    char* get_idname(int id, char* buf) {
-        memset(buf, 0, 21);
-        switch (id) {
-            case ELECTION_ID:
-                strncpy(buf, "ELECTION_ID", 20);
-                break;
-            case AYA_ID:
-                strncpy(buf, "AYA_ID", 20);
-                break;
-            case IAA_ID:
-                strncpy(buf, "IAA_ID", 20);
-                break;
-            case COORD_ID:
-                strncpy(buf, "COORD_ID", 20);
-                break;
-            case ANSWER_ID:
-                strncpy(buf, "ANSWER_ID", 20);
-                break;
-            case CLOCK_ID:
-                strncpy(buf, "CLOCK_ID", 20);
-                break;
-            case IAM_DEAD_JIM:
-                strncpy(buf, "IAM_DEAD_JIM", 20);
-                break;
-            case TERMINATE:
-                strncpy(buf, "TERMINATE", 20);
-                break;
-            default:
-                break;
-        }
-        return buf;
+    return buf;
+}
+
+int random_num(int min_num, int max_num) {
+    int result = 0, low_num = 0, hi_num = 0;
+    if(min_num < max_num)
+    {
+        low_num = min_num;
+        hi_num = max_num + 1;
+    } else {
+        low_num = max_num + 1;
+        hi_num = min_num;
     }
-    
-    int random_num(int min_num, int max_num) {
-        int result = 0, low_num = 0, hi_num = 0;
-        if(min_num < max_num)
-        {
-            low_num = min_num;
-            hi_num = max_num + 1;
-        } else {
-            low_num = max_num + 1;
-            hi_num = min_num;
-        }
-        srand(time(NULL));
-        result = (rand()%(hi_num - low_num)) + low_num;
-        return result;
+    srand(time(NULL));
+    result = (rand()%(hi_num - low_num)) + low_num;
+    return result;
+}
+
+//before send message, increase its DLC and set buffer[0] = DLC
+void set_clock(int* buf, int* dlc) {
+    *dlc += 1;
+    buf[0] = htonl(*dlc);
+}
+//upon receving a message from other node, update DLC
+void update_clock(int* local, int remote) {
+    if (*local < remote) {
+        *local = remote;
     }
-    
-    //before send message, increase its DLC and set buffer[0] = DLC
-    void set_clock(int* buf, int* dlc) {
-        *dlc += 1;
-        buf[0] = htonl(*dlc);
+}
+
+
+void send_message(int source, int dest, int type, int* buffer, int buff_size, int mode, int* DLC) {
+    set_clock(buffer, DLC);
+    if (mode) {
+        printf("[ DLC: %d ] Message Sent >>> From: [ Node: %d] To: [ Node: %d ], Message Type: %d [ %s ] \n", *DLC, source, dest, type, get_idname(type,IDBUF));
     }
-    //upon receving a message from other node, update DLC
-    void update_clock(int* local, int remote) {
-        if (*local < remote) {
-            *local = remote;
-        }
+    MPI_Send(buffer, buff_size, MPI_INT, dest, type, MPI_COMM_WORLD);
+}
+
+
+// call for an election
+void call_election(int size, int rank, int* buffer, int buff_size, int mode, int* DLC) {
+    int i;
+    for (i=rank+1; i < size; i++) {
+        send_message(rank, i, ELECTION_ID, buffer, buff_size, mode, DLC);
     }
-    
-    
-    void send_message(int source, int dest, int type, int* buffer, int buff_size, int mode, int* DLC) {
-        set_clock(buffer, DLC);
-        if (mode) {
-            printf("[ DLC: %d ] Message Sent >>> From: [ Node: %d] To: [ Node: %d ], Message Type: %d [ %s ] \n", *DLC, source, dest, type, get_idname(type,IDBUF));
-        }
-        MPI_Send(buffer, buff_size, MPI_INT, dest, type, MPI_COMM_WORLD);
+}
+
+//send coordination message
+void send_coord(int rank, int* buffer, int buff_size, int mode, int* DLC) {
+    int i = rank - 1;
+    while (i > 0) {
+        send_message(rank, i, COORD_ID, buffer, buff_size, mode, DLC);
+        i--;
     }
-    
-    
-    // call for an election
-    void call_election(int size, int rank, int* buffer, int buff_size, int mode, int* DLC) {
-        int i;
-        for (i=rank+1; i < size; i++) {
-            send_message(rank, i, ELECTION_ID, buffer, buff_size, mode, DLC);
-        }
-    }
-    
-    //send coordination message
-    void send_coord(int rank, int* buffer, int buff_size, int mode, int* DLC) {
-        int i = rank - 1;
-        while (i > 0) {
-            send_message(rank, i, COORD_ID, buffer, buff_size, mode, DLC);
-            i--;
-        }
-    }
-    
+}
+
