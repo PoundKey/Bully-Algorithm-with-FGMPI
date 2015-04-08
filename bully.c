@@ -11,6 +11,13 @@
 /******* FG-MPI Boilerplate begin *********/
 #include "fgmpi.h"
 
+// enum to keep tracking a node's internal state
+typedef enum {
+    PROBING = 1000,
+    ELECTING,
+    COORDINATING; //The node currently is coordinator
+} State;
+
 /*forward declaration*/
 int bully( int argc, char** argv );
 char* get_idname(int id, char* buf);
@@ -68,16 +75,17 @@ int bully( int argc, char** argv )
     int rank, size, coSize, sRank;
     MPI_Status status;
     
+    
     int DLC = 0; // logical clock
     int MODE, TIMEOUT, AYATIME, SENDFAILURE, RETURNLIFE;
     int timeout_val = 0; //timeout tracking value in second
     int aya_val = 0; //AYA message tracking value in second
     
-    int electing = FALSE, probing = TRUE, isCoord = FALSE, isActive = TRUE, isAnswer = FALSE;
+    State state = PROBING; // node's internal state: probing, electing or coordinating
+    int isActive = TRUE, isAnswer = FALSE;
+    
     
     int coordinator; // the rank of coordinator
-    
-    //char IDBUF[21];
     
     int buffer[1];  //buffer[0] = DLC
     int buff_size = 1;
@@ -113,10 +121,10 @@ int bully( int argc, char** argv )
         // send coordination messages to all other nodes except node 0 (clock process)
         coordinator = size - 1;
         if (rank == coordinator) {
-            isCoord = TRUE;
+            state = COORDINATING;
             sleep(1);
             // delcare leader before sending out the coordination message
-            printf("[ DLC: %d ] [ LEADER ] [ Node: %d ] declares itself as the leader! \n", DLC, rank);
+            printf("[ DLC: %d ] [ LEADER ] [ Node: %d ] declares itself as the coordinator! \n", DLC, rank);
             send_coord(rank, buffer, buff_size, MODE, &DLC); // send coordination messages
         }
         
@@ -127,13 +135,74 @@ int bully( int argc, char** argv )
             int remote_rank = status.MPI_SOURCE;
             if (MODE && MSG_ID != CLOCK_ID) {
                 
-                printf("[ DLC: %d ] Message Recv >>> Home: [ Node: %d] SR: [ Node: %d ], Message Type: %d [ %s ] \n", DLC, rank, remote_rank, MSG_ID, get_idname(MSG_ID, IDBUF));
+                printf("[ DLC: %d ] Message Recv >>> Home: [ Node: %d] Sr: [ Node: %d ], Message Type: %d [ %s ] \n", DLC, rank, remote_rank, MSG_ID, get_idname(MSG_ID, IDBUF));
             }
             
             if (MSG_ID != CLOCK_ID) {
                 update_clock(&DLC, ntohl(buffer[0]));
             }
             
+            
+            if (isActive) {
+                //TODO: Start Handling incoming messages for nodes that are active
+                switch (MSG_ID) {
+                    
+                    case CLOCK_ID:
+                        timeout_val++;
+                        break;
+                    default:
+                        break;
+                }
+                
+            } // end of active state message handling
+            
+            else {
+                //TODO: Start Handling incoming messages for nodes that are not active
+                switch (MSG_ID) {
+                    case ELECTION_ID:
+                        break;
+                    case AYA_ID:
+                        break;
+                    case IAA_ID:
+                        break;
+                    case COORD_ID:
+                        break;
+                    case ANSWER_ID:
+                        break;
+                    case CLOCK_ID:
+                        if (state == PROBING) {
+                            aya_val++;
+                        }
+                        timeout_val++;
+                        break;
+                    case IAM_DEAD_JIM:
+                        
+                        break;
+                    case TERMINATE:
+                        
+                        break;
+                    default:
+                        break;
+                }
+                
+                //when return to life timeout reached, switch state to become active
+                if (timeout_val == RETURNLIFE) {
+                    isActive = TRUE;
+                    electing = TRUE;
+                    probing = FALSE;
+                    isAnswer = FALSE;
+                    isCoord = FALSE;
+                    timeout_val = 0;
+                    aya_val = 0;
+                    printf("[ DLC: %d ]  [ ALIVE ]     [ Node: %d ] ex-coordinator declares its return to alive! \n", DLC, rank);
+                    printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! \n", DLC, rank);
+                    call_election(size, rank, buffer, buff_size, MODE, &DLC);
+                }
+            } // end of inactive state message handling
+            
+            
+            
+            /**
             switch (MSG_ID) {
                 case ELECTION_ID:
                     if (isActive) {
@@ -230,9 +299,10 @@ int bully( int argc, char** argv )
                     break;
                 default:
                     break;
-            }
+            } //end of switch (MSG_ID)
             
             
+
             if (isActive) {
                 // when the current node is active
                 if (probing && !isCoord) {
@@ -294,24 +364,18 @@ int bully( int argc, char** argv )
                     }
                     
                 }
-                
+              
+              //end of isActive handling  
             } else {
              // when the current node is inactive
                 if (timeout_val == RETURNLIFE) {
                     isActive = TRUE;
-                    probing = FALSE;
-                    electing = TRUE;
-                    isAnswer = FALSE;
-                    isCoord = FALSE;
-                    timeout_val = 0;
-                    aya_val = 0;
-                    printf("[ DLC: %d ] [ ALIVE ] [ Node: %d ] coordinator declares its alive! \n", DLC, rank);
-                    printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! \n", DLC, rank);
-                    call_election(size, rank, buffer, buff_size, MODE, &DLC);
-                }
-                
-            }
+                   
+                }   
+            } // end of unactive handling
+             */
         }
+       
     }
     
     
