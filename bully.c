@@ -86,7 +86,7 @@ int bully( int argc, char** argv ) {
     int aya_val = 0; //AYA message tracking value in second
     
     State state = PROBING; // node's internal state: probing, electing or coordinating
-    int isActive = TRUE, isAnswer = FALSE, AYAsent = FALSE;
+    int isActive = TRUE, isAnswer = FALSE, initAYA = TRUE;
     
     
     int coordinator; // the rank of coordinator
@@ -225,17 +225,16 @@ int bully( int argc, char** argv ) {
                         }
                         break;
                     case ANSWER_ID:
-                        state = ELECTING;
-                        isAnswer = TRUE;
-                        clear_val(&timeout_val, &aya_val);
+                        if (state == ELECTING) {
+                            isAnswer = TRUE;
+                            clear_val(&timeout_val, &aya_val);
+                        }
                         break;
                     case CLOCK_ID:
                         if (state == PROBING) {
                             aya_val++;
                         }
-                        if (AYAsent) {
-                            timeout_val++;
-                        }
+                        timeout_val++;
                         break;
                     case IAM_DEAD_JIM:
                         // RESERVED
@@ -253,8 +252,12 @@ int bully( int argc, char** argv ) {
                         //send aya message to the coordinator if AYATIME reached
                         if (aya_val == AYATIME) {
                             send_message(rank, coordinator, AYA_ID, buffer, buff_size, MODE, &DLC);
-                            if (!AYAsent) AYAsent = TRUE;
-                            aya_val = 0; //reset aya_val for next round of probing
+                            if (initAYA) {
+                                clear_val(&timeout_val, &aya_val);
+                                initAYA = FALSE;
+                            } else {
+                                aya_val = 0; //reset aya_val for next round of probing
+                            }
                         }
                         //printf("[ Node: %d ] Current timeout_val: %d [ Elapsed Time: %fs ]\n", rank, timeout_val, MPI_Wtime()-start_time);
                         //Oops, timeout in probing state, coordinator is dead, we need to call an election
@@ -316,6 +319,8 @@ int bully( int argc, char** argv ) {
                     //when a coordinator comes back to alive, it declares itself as the coordinator and send out the coordination message
                     if (rank == (size-1)) {
                         state = COORDINATING;
+                        printf("[ DLC: %d ]  [ LEADER ] [ Node: %d ] declares itself as the coordinator! [ Elapsed Time: %fs ]\n",
+                               DLC, rank, MPI_Wtime()-start_time);
                         send_coord(rank, buffer, buff_size, MODE, &DLC);
                     } else {
                         state = ELECTING;
