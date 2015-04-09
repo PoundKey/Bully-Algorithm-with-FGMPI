@@ -86,7 +86,7 @@ int bully( int argc, char** argv ) {
     int aya_val = 0; //AYA message tracking value in second
     
     State state = PROBING; // node's internal state: probing, electing or coordinating
-    int isActive = TRUE, isAnswer = FALSE;
+    int isActive = TRUE, isAnswer = FALSE, AYAsent = FALSE;
     
     
     int coordinator; // the rank of coordinator
@@ -213,8 +213,8 @@ int bully( int argc, char** argv ) {
                             state = ELECTING;
                             isAnswer = FALSE;
                             clear_val(&timeout_val, &aya_val);
-                            printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! [ Elapsed Time: %fs ]\n",
-                                   DLC, rank, MPI_Wtime()-start_time);
+                            printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! [ Coord: %d ] [ Elapsed Time: %fs ]\n",
+                                   DLC, rank, coordinator, MPI_Wtime()-start_time);
                             call_election(size, rank, buffer, buff_size, MODE, &DLC);
                         } else {
                             //set the coordinator
@@ -233,7 +233,9 @@ int bully( int argc, char** argv ) {
                         if (state == PROBING) {
                             aya_val++;
                         }
-                        timeout_val++;
+                        if (AYAsent) {
+                            timeout_val++;
+                        }
                         break;
                     case IAM_DEAD_JIM:
                         // RESERVED
@@ -251,14 +253,16 @@ int bully( int argc, char** argv ) {
                         //send aya message to the coordinator if AYATIME reached
                         if (aya_val == AYATIME) {
                             send_message(rank, coordinator, AYA_ID, buffer, buff_size, MODE, &DLC);
+                            if (!AYAsent) AYAsent = TRUE;
                             aya_val = 0; //reset aya_val for next round of probing
                         }
-                        
+                        //printf("[ Node: %d ] Current timeout_val: %d [ Elapsed Time: %fs ]\n", rank, timeout_val, MPI_Wtime()-start_time);
                         //Oops, timeout in probing state, coordinator is dead, we need to call an election
                         if (timeout_val == TIMEOUT) {
                             printf("[ DLC: %d ]  [ LEADERDEAD ] [ Node: %d ] detects coordinator failure! [ Elapsed Time: %fs ]\n",
                                    DLC, rank, MPI_Wtime()-start_time);
-                            printf("[ DLC: %d ]  [ ELECTION ]   [ Node: %d ] calls an election! \n", DLC, rank);
+                            printf("[ DLC: %d ]  [ ELECTION ]   [ Node: %d ] calls an election! [ Coord: %d ] [ Elapsed Time: %fs ]\n",
+                                   DLC, rank, coordinator, MPI_Wtime()-start_time);
                             state = ELECTING;
                             isAnswer = FALSE;
                             clear_val(&timeout_val, &aya_val);
@@ -281,8 +285,8 @@ int bully( int argc, char** argv ) {
                             // call election again, because the only answer received, but not the coordination message
                             state = ELECTING;
                             clear_val(&timeout_val, &aya_val);
-                            printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! [ Elapsed Time: %fs ]\n",
-                                   DLC, rank, MPI_Wtime()-start_time);
+                            printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! [ Coord: %d ] [ Elapsed Time: %fs ]\n",
+                                   DLC, rank, coordinator, MPI_Wtime()-start_time);
                             call_election(size, rank, buffer, buff_size, MODE, &DLC);
                         }
                         break;
@@ -310,8 +314,8 @@ int bully( int argc, char** argv ) {
                     clear_val(&timeout_val, &aya_val);
                     printf("[ DLC: %d ]  [ ALIVE ]     [ Node: %d ] ex-coordinator declares its return to alive! [ Elapsed Time: %fs ]\n",
                            DLC, rank, MPI_Wtime()-start_time);
-                    printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! [ Elapsed Time: %fs ]\n",
-                           DLC, rank, MPI_Wtime()-start_time);
+                    printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! [ Coord: %d ] [ Elapsed Time: %fs ]\n",
+                           DLC, rank, coordinator, MPI_Wtime()-start_time);
                     call_election(size, rank, buffer, buff_size, MODE, &DLC);
                 }
             } // end of inactive state message handling
