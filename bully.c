@@ -187,7 +187,8 @@ int bully( int argc, char** argv ) {
                             if (survivalRate > SENDFAILURE) {
                                 // Oh yes, the node survived, send back a IAA message
                                 if (MODE) {
-                                    printf(">>> Survival rate: %d > %d (SF), I will live on! (Coordinator: %d) [ Elapsed Time: %fs ]\n\n", survivalRate, SENDFAILURE, rank, MPI_Wtime()-start_time);
+                                    printf(">>> Survival rate: %d > %d (SF), I will live on! (Coordinator: %d) [ Elapsed Time: %fs ]\n\n",
+                                           survivalRate, SENDFAILURE, rank, MPI_Wtime()-start_time);
                                 }
                                 send_message(rank, remote_rank, IAA_ID, buffer, buff_size, MODE, &DLC);
                             } else {
@@ -196,7 +197,8 @@ int bully( int argc, char** argv ) {
                                 state = PROBING;
                                 isAnswer = FALSE;
                                 clear_val(&timeout_val, &aya_val);
-                                printf("[ DLC: %d ]  [ DEAD ]  [ Node: %d ] enters a sudo-dead mode! [ Elapsed Time: %fs ]\n", DLC, rank, MPI_Wtime()-start_time);
+                                printf("[ DLC: %d ]  [ DEAD ]  [ Node: %d ] enters a sudo-dead mode! [ Elapsed Time: %fs ]\n",
+                                       DLC, rank, MPI_Wtime()-start_time);
                             }
                             
                         }
@@ -211,7 +213,8 @@ int bully( int argc, char** argv ) {
                             state = ELECTING;
                             isAnswer = FALSE;
                             clear_val(&timeout_val, &aya_val);
-                            printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! [ Elapsed Time: %fs ]\n", DLC, rank, MPI_Wtime()-start_time);
+                            printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! [ Elapsed Time: %fs ]\n",
+                                   DLC, rank, MPI_Wtime()-start_time);
                             call_election(size, rank, buffer, buff_size, MODE, &DLC);
                         } else {
                             //set the coordinator
@@ -274,7 +277,7 @@ int bully( int argc, char** argv ) {
                             printf("[ DLC: %d ]  [ LEADER ] [ Node: %d ] declares itself as the coordinator! [ Elapsed Time: %fs ]\n",
                                    DLC, rank, MPI_Wtime()-start_time);
                             send_coord(rank, buffer, buff_size, MODE, &DLC);
-                        } else if ((timeout_val == TIMEOUT) && isAnswer) {
+                        } else if ((timeout_val == size*TIMEOUT) && isAnswer) {
                             // call election again, because the only answer received, but not the coordination message
                             state = ELECTING;
                             clear_val(&timeout_val, &aya_val);
