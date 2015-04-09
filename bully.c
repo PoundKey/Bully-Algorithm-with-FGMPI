@@ -310,13 +310,19 @@ int bully( int argc, char** argv ) {
                 if (timeout_val == RETURNLIFE) {
                     isActive = TRUE;
                     isAnswer = FALSE;
-                    state = ELECTING;
-                    clear_val(&timeout_val, &aya_val);
                     printf("[ DLC: %d ]  [ ALIVE ]     [ Node: %d ] ex-coordinator declares its return to alive! [ Elapsed Time: %fs ]\n",
                            DLC, rank, MPI_Wtime()-start_time);
-                    printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! [ Coord: %d ] [ Elapsed Time: %fs ]\n",
-                           DLC, rank, coordinator, MPI_Wtime()-start_time);
-                    call_election(size, rank, buffer, buff_size, MODE, &DLC);
+                    clear_val(&timeout_val, &aya_val);
+                    //when a coordinator comes back to alive, it declares itself as the coordinator and send out the coordination message
+                    if (rank == (size-1)) {
+                        state = COORDINATING;
+                        send_coord(rank, buffer, buff_size, MODE, &DLC);
+                    } else {
+                        state = ELECTING;
+                        printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! [ Coord: %d ] [ Elapsed Time: %fs ]\n",
+                               DLC, rank, coordinator, MPI_Wtime()-start_time);
+                        call_election(size, rank, buffer, buff_size, MODE, &DLC);
+                    }
                 }
             } // end of inactive state message handling
         } //end of while(1) looping
