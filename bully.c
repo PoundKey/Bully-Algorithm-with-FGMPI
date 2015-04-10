@@ -79,6 +79,7 @@ void usage(char * cmd, int rank) {
 int bully( int argc, char** argv ) {
     int rank, size, coSize, sRank;
     MPI_Status status;
+    MPI_Request	recv_request;
     
     int DLC = 0; // logical clock
     int MODE, TIMEOUT, AYATIME, SENDFAILURE, RETURNLIFE;
@@ -127,7 +128,6 @@ int bully( int argc, char** argv ) {
     else {
         // when the program starts, the node with the highest rank declares itself as the coordinator
         // send coordination messages to all other nodes except node 0 (clock process)
-        
         coordinator = size - 1;
         if (rank == coordinator) {
             state = COORDINATING;
@@ -137,8 +137,10 @@ int bully( int argc, char** argv ) {
             usleep(1000000);
             send_coord(rank, buffer, buff_size, MODE, &DLC); // send coordination messages
         }
-        
+        //aya_val = rank % AYATIME;
+        //printf("aya_val: %d \n", aya_val);
         while (1) {
+            
             MPI_Recv(buffer, buff_size, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
             
             int MSG_ID = status.MPI_TAG;
@@ -416,10 +418,16 @@ void send_message(int source, int dest, int type, int* buffer, int buff_size, in
 
 // call for an election
 void call_election(int size, int rank, int* buffer, int buff_size, int mode, int* DLC) {
-    int i;
+    int i = size - 1;
+    while (i > rank) {
+        send_message(rank, i, ELECTION_ID, buffer, buff_size, mode, DLC);
+        i--;
+    }
+    /**
     for (i=rank+1; i < size; i++) {
         send_message(rank, i, ELECTION_ID, buffer, buff_size, mode, DLC);
     }
+     */
 }
 
 //send coordination message
