@@ -12,8 +12,9 @@ the program will hang up and stop receving any further messages.
 Because of this problem, this implementation would not be able to take too many nodes.
 With -nfg 4, the program and the bully algorithm works perfectly. However when -nfg > 5,
 there are chances that this program many hang up indefinitely due to a full message  buffer queue.
+[ /home/c/cs416/fgmpi/bin/mpirun  -nfg 4 -n 1 ./bully 1 10 5 50 20 ]
 
-I have given my best try on this assignment.
+I have given my best try on this assignment. So please take some time going over the code.
 
 Thanks.
 
