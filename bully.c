@@ -79,7 +79,7 @@ void usage(char * cmd, int rank) {
 int bully( int argc, char** argv ) {
     int rank, size, coSize, sRank;
     MPI_Status status;
-    MPI_Request	recv_request;
+    //MPI_Request	recv_request;
     
     int DLC = 0; // logical clock
     int MODE, TIMEOUT, AYATIME, SENDFAILURE, RETURNLIFE;
@@ -112,7 +112,8 @@ int bully( int argc, char** argv ) {
     
     
     start_time = MPI_Wtime();
-
+    aya_val = rank % AYATIME;
+    
     // If rank = 0, let's set it as the clock process, send clock tick to each node every second
     if (rank == 0) {
         while(1) {
@@ -137,8 +138,7 @@ int bully( int argc, char** argv ) {
             usleep(1000000);
             send_coord(rank, buffer, buff_size, MODE, &DLC); // send coordination messages
         }
-        //aya_val = rank % AYATIME;
-        //printf("aya_val: %d \n", aya_val);
+       
         while (1) {
             
             MPI_Recv(buffer, buff_size, MPI_INT, MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &status);
@@ -223,7 +223,11 @@ int bully( int argc, char** argv ) {
                             coordinator = remote_rank;
                             state = PROBING;
                             isAnswer = FALSE;
-                            clear_val(&timeout_val, &aya_val);
+                            if (!initAYA) {
+                                clear_val(&timeout_val, &aya_val);
+                            } else {
+                                timeout_val = 0;
+                            }
                         }
                         break;
                     case ANSWER_ID:
@@ -252,6 +256,7 @@ int bully( int argc, char** argv ) {
                 switch (state) {
                     case PROBING:
                         //send aya message to the coordinator if AYATIME reached
+                        //printf("[ Node: %d ]: Aya_val before comp: %d \n", rank, aya_val);
                         if (aya_val == AYATIME) {
                             send_message(rank, coordinator, AYA_ID, buffer, buff_size, MODE, &DLC);
                             if (initAYA) {
