@@ -413,11 +413,12 @@ void update_clock(int* local, int remote) {
 
 void send_message(int source, int dest, int type, int* buffer, int buff_size, int mode, int* DLC) {
     set_clock(buffer, DLC);
+    MPI_Request request;
     if (mode) {
         printf("[ DLC: %d ] > Sent From: [ Node: %d] To: [ Node: %d ], Message Type: %d [ %s ] [ Elapsed Time: %fs ]\n",
                *DLC, source, dest, type, get_idname(type,IDBUF), MPI_Wtime()-start_time);
     }
-    MPI_Send(buffer, buff_size, MPI_INT, dest, type, MPI_COMM_WORLD);
+    MPI_Isend(buffer, buff_size, MPI_INT, dest, type, MPI_COMM_WORLD, &request);
 }
 
 
