@@ -1,0 +1,6 @@
+A complete test with 1000 nodes, and with SENDFAILURE = 80.
+Expect: The coordinator should enter a dead mode if its Survival rate < SENDFAILURE.
+				A LEADERDEAD will be detected by the workers, and eletions will be called after.
+				After 15 second, the coordinator will return alive in 30 seconds and the next round AYA-IAA probing starts.
+Result: SUCCEED!
+

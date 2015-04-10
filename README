@@ -3,18 +3,13 @@ Dear TA,
 Please refer to the test_x.txt to view the test files. 
 These are the test cases demo how the program is being tested.
 
-Known Issue: Since the recv function is written in a blocking style, meaning that
-the program will have to finish processing current message before can handle and process
-further messages. It seems like the FG-MPI/MPI sets a limit for the message buffer queue, 
-so that when messages on the buffer queue reaches certain amount of number, 
-the program will hang up and stop receving any further messages. 
 
-Because of this problem, this implementation would not be able to take too many nodes.
-With -nfg 4, the program and the bully algorithm works perfectly. However when -nfg > 5,
-there are chances that this program many hang up indefinitely due to a full message  buffer queue.
-[ /home/c/cs416/fgmpi/bin/mpirun  -nfg 4 -n 1 ./bully 1 10 5 50 20 ]
+Interesting notices:
+when the input value of -nfg is relative small, say between 2-5, 
+node 1 and node 2 will result in 1-7 seconds of delay on receving messages. 
+Whereas when -nfg > 10, everything works perfectly. (max. around 1000 processes+thread in total tested).
 
-I have given my best try on this assignment. So please take some time going over the code.
+I have given my best try on this assignment. So please take some time going over the code if you have any concerns.
 
 Thanks.
 
