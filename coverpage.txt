@@ -36,5 +36,7 @@ St. No: 21212121
 Unix Id : j8p8
 Email: xuecnt@hotmail.com
  
-ACKNOWLEDGMENTS : Please refer to the test_x.txt files for furthur references. 
-These are the test cases demo how the program is being tested
+ACKNOWLEDGMENTS : Please read README.
+
+
+

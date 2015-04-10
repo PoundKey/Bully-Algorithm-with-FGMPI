@@ -1,14 +1,21 @@
+Dear TA,
 
-This is the starting point for A4. If you do a 
-make it will build the bully program. 
-You can do a quick demo by doing make demo
+Please refer to the test_x.txt to view the test files. 
+These are the test cases demo how the program is being tested.
 
-You should probably try a bunch of different runs 
-to get a sense of what is happening. Here are a few
-more to try. 
+Known Issue: Since the recv function is written in a blocking style, meaning that
+the program will have to finish processing current message before can handle and process
+further messages. It seems like the FG-MPI/MPI sets a limit for the message buffer queue, 
+so that when messages on the buffer queue reaches certain amount of number, 
+the program will hang up and stop receving any further messages. 
 
-/home/c/cs416/fgmpi/bin/mpirun -nfg 4 -n 4 ./bully
-/home/c/cs416/fgmpi/bin/mpirun -nfg 12 -n 8 ./bully
-/home/c/cs416/fgmpi/bin/mpirun -nfg 4 -n 1 ./bully
-/home/c/cs416/fgmpi/bin/mpirun -nfg 1 -n 4 ./bully
+Because of this problem, this implementation would not be able to take too many nodes.
+With -nfg 4, the program and the bully algorithm works perfectly. However when -nfg > 5,
+there are chances that this program many hang up indefinitely due to a full message  buffer queue.
 
+I have given my best try on this assignment.
+
+Thanks.
+
+Regard,
+Chang
