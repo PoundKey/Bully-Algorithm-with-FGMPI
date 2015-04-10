@@ -35,13 +35,6 @@ Name : Chang Tong Xue
 St. No: 21212121
 Unix Id : j8p8
 Email: xuecnt@hotmail.com
-
-
-STUDENT  2
-Name :
-St. No:
-Unix Id :
-Email:
-
-
-ACKNOWLEDGMENTS :
+ 
+ACKNOWLEDGMENTS : Please refer to the test_x.txt files for furthur references. 
+These are the test cases demo how the program is being tested
