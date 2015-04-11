@@ -168,6 +168,8 @@ int bully( int argc, char** argv ) {
                                     isAnswer = FALSE;
                                     clear_val(&timeout_val, &aya_val);
                                     send_message(rank, remote_rank, ANSWER_ID, buffer, buff_size, MODE, &DLC);
+                                    printf("[ DLC: %d ]  [ ELECTION ]  [ Node: %d ] calls an election! [ Coord: %d ] [ Elapsed Time: %fs ]\n",
+                                           DLC, rank, coordinator, MPI_Wtime()-start_time);                                    
                                     call_election(size, rank, buffer, buff_size, MODE, &DLC);
                                     break;
                                 case ELECTING:
